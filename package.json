@@ -1,0 +1,37 @@
+{
+  "name": "campus-eventos",
+  "private": true,
+  "description": "Backend de Campus Eventos: API REST y worker de notificaciones (NestJS + PostgreSQL + SQS)",
+  "workspaces": [
+    "shared",
+    "api",
+    "worker"
+  ],
+  "scripts": {
+    "build": "npm run build -w shared && npm run build -w api && npm run build -w worker",
+    "pretest": "npm run build -w shared",
+    "test": "npm test -w shared && npm test -w api && npm test -w worker",
+    "dev:deps": "docker compose up -d postgres elasticmq mock-externo",
+    "start:api": "npm run start -w api",
+    "start:worker": "npm run start -w worker",
+    "demo:up": "docker compose up -d --build",
+    "demo:concurrencia": "node scripts/prueba-concurrencia.mjs",
+    "demo:caida": "node scripts/prueba-concurrencia.mjs --matar-replica",
+    "demo:breaker": "node scripts/demo-breaker.mjs"
+  },
+  "engines": {
+    "node": ">=22.9"
+  },
+  "devDependencies": {
+    "@types/express": "5.0.6",
+    "@types/jest": "29.5.14",
+    "@types/node": "22.20.5",
+    "@types/opossum": "8.1.9",
+    "@types/pg": "8.23.1",
+    "@types/supertest": "7.2.1",
+    "jest": "29.7.0",
+    "supertest": "7.3.1",
+    "ts-jest": "29.4.15",
+    "typescript": "5.9.3"
+  }
+}

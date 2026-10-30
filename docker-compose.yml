@@ -1,0 +1,116 @@
+# Entorno local completo: el mismo código corre aquí y en AWS cambiando solo variables de entorno.
+#   npm run dev:deps          solo dependencias (Postgres, cola, mock) para correr la API con npm
+#   docker compose up -d      todo: nginx + 2 réplicas de la API + worker (API en :3000, o API_PORT)
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: eventos
+      POSTGRES_USER: eventos_admin
+      POSTGRES_PASSWORD: eventos_local
+    ports:
+      - "5435:5432"  # 5432 suele estar ocupado por un Postgres local
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U eventos_admin -d eventos"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+  # Cola compatible con SQS: notificaciones + DLQ tras 3 recepciones (ver elasticmq/elasticmq.conf).
+  elasticmq:
+    image: softwaremill/elasticmq-native:1.7.1
+    ports:
+      - "9324:9324"
+    volumes:
+      - ./elasticmq/elasticmq.conf:/opt/elasticmq.conf:ro
+
+  # Servicio externo simulado: POST /validar-correo, con ?delay_ms= y ?fail=1.
+  mock-externo:
+    image: node:22-alpine
+    command: ["node", "/app/mock-externo.mjs"]
+    environment:
+      PORT: "4010"
+      ALLOWED_DOMAIN: universidad.edu.co
+    ports:
+      - "4010:4010"
+    volumes:
+      - ./tools/mock-externo.mjs:/app/mock-externo.mjs:ro
+
+  api-1: &api
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    image: campus-eventos-api:local
+    environment:
+      PORT: "3000"
+      AWS_REGION: us-east-1
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: eventos
+      DB_USER: eventos_admin
+      DB_PASSWORD: eventos_local
+      DB_SSL: "false"
+      QUEUE_URL: http://elasticmq:9324/000000000000/notificaciones
+      EXTERNAL_URL: http://mock-externo:4010
+      # Para la demo del breaker: EXTERNAL_QUERY=fail=1 docker compose up -d api-1 api-2
+      EXTERNAL_QUERY: ${EXTERNAL_QUERY:-}
+      # Las 2 réplicas DEBEN compartir el secreto para aceptar los tokens de la otra.
+      JWT_SECRET: secreto-local-compartido-por-las-replicas
+      SEED_DEMO: "true"
+      AWS_ENDPOINT_URL: http://elasticmq:9324
+      AWS_ACCESS_KEY_ID: local
+      AWS_SECRET_ACCESS_KEY: local
+    depends_on:
+      postgres:
+        condition: service_healthy
+      elasticmq:
+        condition: service_started
+      mock-externo:
+        condition: service_started
+
+  # Segunda réplica: misma imagen que api-1 (no la vuelve a construir).
+  api-2:
+    <<: *api
+    build: !reset null
+    depends_on:
+      api-1:
+        condition: service_started
+
+  nginx:
+    image: nginx:1.27-alpine
+    ports:
+      - "${API_PORT:-3000}:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - api-1
+      - api-2
+
+  worker:
+    build:
+      context: .
+      dockerfile: worker/Dockerfile
+    image: campus-eventos-worker:local
+    environment:
+      AWS_REGION: us-east-1
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: eventos
+      DB_USER: eventos_admin
+      DB_PASSWORD: eventos_local
+      DB_SSL: "false"
+      QUEUE_URL: http://elasticmq:9324/000000000000/notificaciones
+      # Sin SNS_TOPIC_ARN en local: el envío queda en el log (ElasticMQ no trae SNS).
+      AWS_ENDPOINT_URL: http://elasticmq:9324
+      AWS_ACCESS_KEY_ID: local
+      AWS_SECRET_ACCESS_KEY: local
+    depends_on:
+      postgres:
+        condition: service_healthy
+      elasticmq:
+        condition: service_started
+
+volumes:
+  pgdata:

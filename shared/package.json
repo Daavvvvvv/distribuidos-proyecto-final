@@ -1,0 +1,31 @@
+{
+  "name": "@eventos/shared",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Esquema, migración, pool de Postgres y logger compartidos por api y worker",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -b",
+    "test": "jest --runInBand"
+  },
+  "dependencies": {
+    "@aws-sdk/client-sns": "3.1160.0",
+    "@aws-sdk/client-sqs": "3.1160.0",
+    "@smithy/node-http-handler": "4.14.0",
+    "pg": "8.23.1",
+    "pino": "10.4.0"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "transform": {
+      "^.+\\.ts$": [
+        "ts-jest",
+        {
+          "tsconfig": "tsconfig.test.json"
+        }
+      ]
+    },
+    "testRegex": "test/.*\\.spec\\.ts$"
+  }
+}
