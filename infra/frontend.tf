@@ -1,6 +1,8 @@
 # El build de Vite se sube a este bucket privado; solo CloudFront puede leerlo (OAC).
 resource "aws_s3_bucket" "frontend" {
   bucket = "${local.nombre}-frontend-${data.aws_caller_identity.actual.account_id}"
+  # terraform destroy vacía el bucket antes de borrarlo.
+  force_destroy = true
 }
 
 resource "aws_s3_bucket_public_access_block" "frontend" {

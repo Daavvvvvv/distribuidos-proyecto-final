@@ -42,8 +42,13 @@ resource "aws_ecs_task_definition" "api" {
     image        = "${aws_ecr_repository.api.repository_url}:latest"
     essential    = true
     portMappings = [{ containerPort = 3000, hostPort = 3000, protocol = "tcp" }]
-    environment  = local.entorno_comun
-    secrets      = [local.secreto_bd]
+    # SEED_DEMO crea las cuentas de la demo (ana y club) y unos eventos; es idempotente.
+    environment = concat(local.entorno_comun, [{ name = "SEED_DEMO", value = "true" }])
+    secrets = [
+      local.secreto_bd,
+      # Desde la versión (no el secreto) para que la tarea no arranque antes de que exista el valor.
+      { name = "JWT_SECRET", valueFrom = aws_secretsmanager_secret_version.jwt.secret_arn },
+    ]
     logConfiguration = {
       logDriver = "awslogs"
       options = {
@@ -100,7 +105,8 @@ resource "aws_ecs_service" "api" {
     container_port   = 3000
   }
 
-  depends_on = [aws_lb_listener.http]
+  # Sin el permiso de leer el secreto JWT, las tareas nuevas fallarían al arrancar.
+  depends_on = [aws_lb_listener.http, aws_iam_role_policy.leer_secreto_jwt]
 }
 
 resource "aws_ecs_service" "worker" {
