@@ -14,7 +14,8 @@ api/      API REST: auth, eventos, inscripciones, outbox hacia SQS, validación 
 worker/   consumidor de la cola: notifica (SNS o log) y marca ENVIADA, idempotente
 nginx/    balanceador local entre las 2 réplicas (reintenta en la otra si una cae)
 tools/    mock-externo.mjs: servicio de validación de correo simulado
-scripts/  publicar.sh (ECR) y demos para la sustentación
+scripts/  publicar.sh (ECR), poblar-demo.mjs (datos ficticios) y demos para la sustentación
+infra/    Terraform del entorno en AWS (ver infra/README.md)
 ```
 
 ## Correr en local
@@ -43,7 +44,7 @@ Frontend contra este backend: `npm run dev` (reenvía `/api` a `localhost:3000`)
 
 ```bash
 npm run dev:deps
-npm test          # 114 pruebas: unitarias + e2e contra Postgres y ElasticMQ reales
+npm test          # 131 pruebas: unitarias + e2e contra Postgres y ElasticMQ reales
 ```
 
 Las más importantes:
@@ -61,21 +62,22 @@ Las más importantes:
 | Circuit breaker | `EXTERNAL_QUERY=fail=1 docker compose up -d api-1 api-2` y luego `npm run demo:breaker` | los registros no fallan; con el circuito abierto responden en ~60 ms |
 | Worker | `docker compose logs -f worker` | cada inscripción genera un `notificacion_enviada` |
 | Métricas | `curl localhost:3000/metrics` | `inscripciones_total`, `circuito_validacion_estado`, latencias |
+| Datos de prueba | `npm run demo:poblar` | 8 organizadores, 19 eventos, 40 estudiantes e inscripciones, todo por la API |
 
 Si la API está en otro puerto: `API_URL=http://localhost:3100 npm run demo:concurrencia`.
 
 ## Publicar en AWS
 
+Todo el entorno está en `infra/` como Terraform. Su [README](infra/README.md) explica cómo crearlo desde cero, publicar versiones nuevas, encenderlo, apagarlo y retirarlo. En corto, una versión nueva del backend es:
+
 ```bash
-API_REPO=<uri-ecr-api> WORKER_REPO=<uri-ecr-worker> ./scripts/publicar.sh
+API_REPO=$(terraform -chdir=infra output -raw ecr_api) \
+WORKER_REPO=$(terraform -chdir=infra output -raw ecr_worker) \
+./scripts/publicar.sh
+terraform -chdir=infra apply -var app_enabled=true
 ```
 
-Construye para `linux/amd64` (Fargate) con contexto en la raíz del repo (`-f api/Dockerfile .`) y sube `:latest`.
-
-Infra debe tener (ver DISENO-BACKEND.md, "The Assignment"):
-- `JWT_SECRET` como secreto de la tarea de la API.
-- CloudFront `/api/*` reenviando `Authorization`, sin caché y con `POST`/`DELETE` permitidos.
-- Permisos: API `sqs:SendMessage`; worker `sqs:ReceiveMessage`, `sqs:DeleteMessage`, `sns:Publish`.
+`publicar.sh` construye para `linux/amd64` (Fargate) y sube `:latest`; el apply toma el digest de esa imagen y ECS reemplaza las tareas de a una.
 
 ## Límites conocidos del prototipo
 
