@@ -1,4 +1,5 @@
-import { IsInt, IsISO8601, IsOptional, IsString, Length, Matches, Max, MaxLength, Min } from 'class-validator';
+import { IsIn, IsInt, IsISO8601, IsOptional, IsString, Length, Matches, Max, MaxLength, Min } from 'class-validator';
+import { CATEGORIAS } from '../categorias';
 
 // Sin zona horaria, "2026-11-03T08:00" se interpretaría en UTC (Fargate) y quedaría corrido 5 h.
 const CON_ZONA = /(Z|[+-]\d{2}:\d{2})$/;
@@ -26,7 +27,7 @@ export class CrearEventoDto {
   cupo!: number;
 
   @IsString({ message: 'La categoría es obligatoria' })
-  @Length(1, 50, { message: 'La categoría debe tener entre 1 y 50 caracteres' })
+  @IsIn(CATEGORIAS, { message: 'La categoría no es válida' })
   categoria!: string;
 }
 

@@ -16,7 +16,7 @@ describe('Inscripciones', () => {
     const res = await http()
       .post('/api/eventos')
       .set(como(organizador.token))
-      .send({ titulo: 'Taller', descripcion: 'd', fecha: enDias(7), lugar: 'l', cupo, categoria: 'c' })
+      .send({ titulo: 'Taller', descripcion: 'd', fecha: enDias(7), lugar: 'l', cupo, categoria: 'Otro' })
       .expect(201);
     return res.body.id;
   }

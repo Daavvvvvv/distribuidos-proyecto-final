@@ -76,6 +76,7 @@ describe('Eventos (/api/eventos)', () => {
       [{ cupo: '40' }, 'El cupo debe ser un número entero'],
       [{ titulo: 'ab' }, 'El título debe tener entre 3 y 120 caracteres'],
       [{ categoria: undefined }, 'La categoría es obligatoria'],
+      [{ categoria: 'Fiestas' }, 'La categoría no es válida'],
     ])('datos inválidos responden 400: %j', async (cambios, mensaje) => {
       const res = await http().post('/api/eventos').set(como(organizador.token)).send(nuevo(cambios)).expect(400);
       expect(res.body).toEqual({ error: mensaje });
@@ -146,6 +147,13 @@ describe('Eventos (/api/eventos)', () => {
       );
       const res = await http().get('/api/eventos').set(como(estudiante.token)).expect(200);
       expect(res.body).toHaveLength(200);
+    });
+  });
+
+  describe('GET /api/categorias', () => {
+    it('es público y devuelve la lista con la que se validan los eventos', async () => {
+      const res = await http().get('/api/categorias').expect(200);
+      expect(res.body).toEqual(['Académico', 'Tecnología', 'Cultura', 'Deportes', 'Bienestar', 'Otro']);
     });
   });
 

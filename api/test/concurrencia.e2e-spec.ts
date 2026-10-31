@@ -24,7 +24,7 @@ describe('Concurrencia: 200 inscripciones simultáneas, cupo 40, 2 réplicas', (
     const evento = await request(replica1.getHttpServer())
       .post('/api/eventos')
       .set('Authorization', `Bearer ${organizador.token}`)
-      .send({ titulo: 'Cupo 40', descripcion: 'd', fecha: enDias(7), lugar: 'l', cupo: 40, categoria: 'c' })
+      .send({ titulo: 'Cupo 40', descripcion: 'd', fecha: enDias(7), lugar: 'l', cupo: 40, categoria: 'Otro' })
       .expect(201);
     const tokens = await estudiantesDeCarga(replica1, 200);
 

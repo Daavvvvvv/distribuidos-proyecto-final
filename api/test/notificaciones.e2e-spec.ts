@@ -33,7 +33,7 @@ describe('Notificaciones: outbox hacia SQS', () => {
     const res = await request(app.getHttpServer())
       .post('/api/eventos')
       .set('Authorization', `Bearer ${organizador.token}`)
-      .send({ titulo: 'Taller', descripcion: 'd', fecha: enDias(7), lugar: 'l', cupo: 100, categoria: 'c' })
+      .send({ titulo: 'Taller', descripcion: 'd', fecha: enDias(7), lugar: 'l', cupo: 100, categoria: 'Otro' })
       .expect(201);
     return res.body.id;
   }

@@ -27,7 +27,7 @@ describe('GET /metrics', () => {
     const evento = await request(app.getHttpServer())
       .post('/api/eventos')
       .set('Authorization', `Bearer ${organizador.token}`)
-      .send({ titulo: 'Cupo 1', descripcion: 'd', fecha: enDias(3), lugar: 'l', cupo: 1, categoria: 'c' })
+      .send({ titulo: 'Cupo 1', descripcion: 'd', fecha: enDias(3), lugar: 'l', cupo: 1, categoria: 'Otro' })
       .expect(201);
     const inscribir = (token: string) =>
       request(app.getHttpServer())
