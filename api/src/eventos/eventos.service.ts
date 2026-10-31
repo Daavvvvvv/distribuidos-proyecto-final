@@ -1,5 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { Db } from '../db/db';
+import { UNIVERSIDAD_JSON } from '../universidades/universidad-json';
+import type { Universidad } from '../universidades/universidades.service';
 import type { CrearEventoDto, ListarEventosDto } from './dto/eventos.dto';
 
 /** Forma exacta que espera el frontend (README, "Forma de evento"). */
@@ -13,6 +15,8 @@ export interface Evento {
   inscritos: number;
   categoria: string;
   organizador: string;
+  /** La universidad del organizador. */
+  universidad: Universidad | null;
   /** Si el usuario autenticado ya está inscrito. */
   inscrito: boolean;
 }
@@ -27,9 +31,11 @@ export interface Inscrito {
 const SELECT_EVENTO = `
   SELECT e.id, e.titulo, e.descripcion, e.fecha, e.lugar, e.cupo, e.inscritos, e.categoria,
          u.nombre AS organizador,
+         ${UNIVERSIDAD_JSON} AS universidad,
          EXISTS (SELECT 1 FROM inscripciones i WHERE i.evento_id = e.id AND i.usuario_id = $1) AS inscrito
   FROM eventos e
-  JOIN usuarios u ON u.id = e.organizador_id`;
+  JOIN usuarios u ON u.id = e.organizador_id
+  LEFT JOIN universidades un ON un.id = u.universidad_id`;
 
 // Primero los próximos (más cercano primero) y luego los pasados (más reciente primero).
 const ORDEN_EVENTOS = `

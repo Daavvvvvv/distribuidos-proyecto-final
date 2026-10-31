@@ -27,7 +27,7 @@ describe('migrar', () => {
   }));
   afterAll(() => admin((c) => c.query(`DROP DATABASE IF EXISTS ${DB_VACIA} WITH (FORCE)`)));
 
-  it('dos réplicas migrando a la vez sobre una DB vacía terminan sin error y crean las 4 tablas', async () => {
+  it('dos réplicas migrando a la vez sobre una DB vacía terminan sin error y crean las 5 tablas', async () => {
     // Dos pools = dos procesos distintos, como las 2 réplicas de ECS.
     const replicas = [1, 2].map(() => crearPool({ ...base, database: DB_VACIA, ssl: false, max: 2 }));
     try {
@@ -36,7 +36,7 @@ describe('migrar', () => {
       const { rows } = await replicas[0].query<{ table_name: string }>(
         `SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name`,
       );
-      expect(rows.map((r) => r.table_name)).toEqual(['eventos', 'inscripciones', 'notificaciones', 'usuarios']);
+      expect(rows.map((r) => r.table_name)).toEqual(['eventos', 'inscripciones', 'notificaciones', 'universidades', 'usuarios']);
 
       // Idempotente: correrla otra vez sobre tablas existentes no falla.
       await expect(migrar(replicas[1])).resolves.toBeUndefined();

@@ -34,7 +34,7 @@ resource "aws_lambda_function" "mock_externo" {
 
   environment {
     variables = {
-      ALLOWED_DOMAIN = "universidad.edu.co"
+      ALLOWED_SUFFIX = ".edu.co"
     }
   }
 

@@ -30,8 +30,8 @@ export class DemoSeed implements OnApplicationBootstrap {
       ];
       for (const [nombre, email, password, rol] of cuentas) {
         await c.query(
-          `INSERT INTO usuarios (nombre, email, password_hash, rol, correo_validado)
-           VALUES ($1, $2, $3, $4, 'VALIDO')
+          `INSERT INTO usuarios (nombre, email, password_hash, rol, correo_validado, universidad_id)
+           VALUES ($1, $2, $3, $4, 'VALIDO', (SELECT id FROM universidades WHERE dominio = split_part($2, '@', 2)))
            ON CONFLICT (lower(email)) DO NOTHING`,
           [nombre, email, await bcrypt.hash(password, 10), rol],
         );

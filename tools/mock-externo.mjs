@@ -1,4 +1,6 @@
 // Servicio externo simulado de validación de correo institucional (solo para desarrollo local).
+// Simula el directorio de correos institucionales: vale cualquier dominio que termine en ALLOWED_SUFFIX.
+// Qué universidades acepta Campus Eventos lo decide el catálogo del backend, no este servicio.
 // Mismo contrato que el de infra:
 //   POST /validar-correo  { "email": "..." }  ->  { email, valid, domain }
 //   ?delay_ms=3000  demora la respuesta;  ?fail=1  responde 500.
@@ -6,7 +8,7 @@
 import http from 'node:http';
 
 const PORT = Number(process.env.PORT ?? 4010);
-const ALLOWED_DOMAIN = (process.env.ALLOWED_DOMAIN ?? 'universidad.edu.co').toLowerCase();
+const ALLOWED_SUFFIX = (process.env.ALLOWED_SUFFIX ?? '.edu.co').toLowerCase();
 
 function responder(res, status, cuerpo) {
   res.writeHead(status, { 'Content-Type': 'application/json' });
@@ -35,7 +37,7 @@ const servidor = http.createServer((req, res) => {
         return responder(res, 400, { error: 'JSON inválido' });
       }
       const domain = email.split('@')[1]?.toLowerCase() ?? '';
-      responder(res, 200, { email, valid: domain === ALLOWED_DOMAIN, domain });
+      responder(res, 200, { email, valid: domain.endsWith(ALLOWED_SUFFIX), domain });
     }, delayMs);
   });
 });

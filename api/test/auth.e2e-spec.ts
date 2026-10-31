@@ -6,6 +6,7 @@ describe('Auth (/api/auth)', () => {
   let app: INestApplication;
   const http = () => request(app.getHttpServer());
   const ana = { nombre: 'Ana Gómez', email: 'Ana@Universidad.edu.co', password: 'ana123', rol: 'estudiante' };
+  const demo = { id: expect.any(Number), nombre: 'Universidad Demo (cuentas de prueba)', sigla: 'Demo' };
 
   beforeAll(async () => {
     app = await crearApp();
@@ -13,12 +14,38 @@ describe('Auth (/api/auth)', () => {
   beforeEach(() => limpiarDb(app));
   afterAll(() => app.close());
 
-  it('registro devuelve { token, usuario: {id, nombre, email, rol} } con el correo normalizado', async () => {
+  it('registro devuelve { token, usuario: {id, nombre, email, rol, universidad} } con el correo normalizado', async () => {
     const res = await http().post('/api/auth/registro').send(ana).expect(201);
     expect(res.body).toEqual({
       token: expect.any(String),
-      usuario: { id: expect.any(Number), nombre: 'Ana Gómez', email: 'ana@universidad.edu.co', rol: 'estudiante' },
+      usuario: { id: expect.any(Number), nombre: 'Ana Gómez', email: 'ana@universidad.edu.co', rol: 'estudiante', universidad: demo },
     });
+  });
+
+  it('registro con el correo de una universidad del catálogo la asigna al usuario', async () => {
+    const res = await http()
+      .post('/api/auth/registro')
+      .send({ ...ana, email: 'david@EAFIT.edu.co' })
+      .expect(201);
+    expect(res.body.usuario.universidad).toEqual({ id: expect.any(Number), nombre: 'Universidad EAFIT', sigla: 'EAFIT' });
+  });
+
+  it.each(['ana@gmail.com', 'ana@unknown.edu.co', 'ana@eafit.edu.co.evil.com'])(
+    'registro con un dominio que no está en el catálogo responde 400: %s',
+    async (email) => {
+      const res = await http().post('/api/auth/registro').send({ ...ana, email }).expect(400);
+      expect(res.body).toEqual({
+        error: 'Tu universidad no está en Campus Eventos. Usa el correo de una universidad de la lista',
+      });
+    },
+  );
+
+  it('GET /api/universidades es público y lista el catálogo ordenado por nombre', async () => {
+    const res = await http().get('/api/universidades').expect(200);
+    expect(res.body).toHaveLength(15);
+    expect(res.body).toContainEqual({ id: expect.any(Number), nombre: 'Universidad EAFIT', sigla: 'EAFIT', dominio: 'eafit.edu.co' });
+    const nombres = res.body.map((u: { nombre: string }) => u.nombre);
+    expect(nombres).toEqual([...nombres].sort((a: string, b: string) => a.localeCompare(b, 'es')));
   });
 
   it('registro con un correo ya usado (sin importar mayúsculas) responde 400, no 409', async () => {
@@ -51,6 +78,7 @@ describe('Auth (/api/auth)', () => {
       nombre: 'Ana Gómez',
       email: 'ana@universidad.edu.co',
       rol: 'estudiante',
+      universidad: demo,
     });
     expect(res.body.usuario).not.toHaveProperty('password_hash');
   });

@@ -3,6 +3,8 @@ import { JwtService } from '@nestjs/jwt';
 import bcrypt from 'bcryptjs';
 import { DatabaseError } from 'pg';
 import { Db } from '../db/db';
+import { type Universidad, UniversidadesService } from '../universidades/universidades.service';
+import { UNIVERSIDAD_JSON } from '../universidades/universidad-json';
 import { ValidacionCorreoService } from '../validacion-correo/validacion-correo.service';
 import type { Rol } from './decoradores';
 import type { LoginDto, RegistroDto } from './dto/auth.dto';
@@ -12,6 +14,8 @@ export interface UsuarioPublico {
   nombre: string;
   email: string;
   rol: Rol;
+  /** Null solo en cuentas anteriores al catálogo cuyo dominio no está en él. */
+  universidad: Universidad | null;
 }
 
 export interface Sesion {
@@ -27,6 +31,7 @@ export class AuthService {
     private readonly db: Db,
     private readonly jwt: JwtService,
     private readonly validacion: ValidacionCorreoService,
+    private readonly universidades: UniversidadesService,
   ) {}
 
   /**
@@ -35,6 +40,11 @@ export class AuthService {
    */
   async registro(dto: RegistroDto): Promise<Sesion> {
     const email = dto.email.trim().toLowerCase();
+    // El catálogo manda: un dominio que no está ni siquiera se consulta al servicio externo.
+    const universidad = await this.universidades.porCorreo(email);
+    if (!universidad) {
+      throw new BadRequestException('Tu universidad no está en Campus Eventos. Usa el correo de una universidad de la lista');
+    }
     const validacion = await this.validacion.validar(email);
     if (validacion === 'INVALIDO') {
       throw new BadRequestException('El correo debe ser institucional');
@@ -42,13 +52,13 @@ export class AuthService {
 
     const hash = await bcrypt.hash(dto.password, COSTO_BCRYPT);
     try {
-      const { rows } = await this.db.query<UsuarioPublico>(
-        `INSERT INTO usuarios (nombre, email, password_hash, rol, correo_validado)
-         VALUES ($1, $2, $3, $4, $5)
+      const { rows } = await this.db.query<Omit<UsuarioPublico, 'universidad'>>(
+        `INSERT INTO usuarios (nombre, email, password_hash, rol, correo_validado, universidad_id)
+         VALUES ($1, $2, $3, $4, $5, $6)
          RETURNING id, nombre, email, rol`,
-        [dto.nombre.trim(), email, hash, dto.rol, validacion],
+        [dto.nombre.trim(), email, hash, dto.rol, validacion, universidad.id],
       );
-      return this.sesion(rows[0]);
+      return this.sesion({ ...rows[0], universidad });
     } catch (error) {
       // 400 y no 409: el frontend interpreta 409 como "cupo lleno" (DISENO-BACKEND.md, Open Question 2).
       if (error instanceof DatabaseError && error.code === '23505') {
@@ -60,7 +70,9 @@ export class AuthService {
 
   async login(dto: LoginDto): Promise<Sesion> {
     const { rows } = await this.db.query<UsuarioPublico & { password_hash: string }>(
-      `SELECT id, nombre, email, rol, password_hash FROM usuarios WHERE lower(email) = lower($1)`,
+      `SELECT u.id, u.nombre, u.email, u.rol, u.password_hash, ${UNIVERSIDAD_JSON} AS universidad
+       FROM usuarios u LEFT JOIN universidades un ON un.id = u.universidad_id
+       WHERE lower(u.email) = lower($1)`,
       [dto.email.trim()],
     );
     const usuario = rows[0];

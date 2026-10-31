@@ -32,7 +32,7 @@ services:
     command: ["node", "/app/mock-externo.mjs"]
     environment:
       PORT: "4010"
-      ALLOWED_DOMAIN: universidad.edu.co
+      ALLOWED_SUFFIX: .edu.co
     ports:
       - "4010:4010"
     volumes:

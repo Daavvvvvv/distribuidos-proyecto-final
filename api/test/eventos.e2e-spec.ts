@@ -48,6 +48,7 @@ describe('Eventos (/api/eventos)', () => {
         inscritos: 0,
         categoria: 'Tecnología',
         organizador: 'Club de Software',
+        universidad: { id: expect.any(Number), nombre: 'Universidad Demo (cuentas de prueba)', sigla: 'Demo' },
         inscrito: false,
       });
     });

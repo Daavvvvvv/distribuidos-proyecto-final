@@ -54,4 +54,36 @@ CREATE TABLE IF NOT EXISTS notificaciones (
   creado_en TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS notificaciones_pendientes ON notificaciones (creado_en) WHERE estado = 'PENDIENTE';
+
+-- Catálogo de universidades: el registro solo acepta correos de estos dominios.
+-- Para agregar una, una fila más aquí; ON CONFLICT la hace idempotente.
+CREATE TABLE IF NOT EXISTS universidades (
+  id SERIAL PRIMARY KEY,
+  nombre TEXT NOT NULL,
+  sigla TEXT NOT NULL,
+  dominio TEXT NOT NULL UNIQUE
+);
+INSERT INTO universidades (nombre, sigla, dominio) VALUES
+  ('Universidad EAFIT', 'EAFIT', 'eafit.edu.co'),
+  ('Universidad de Antioquia', 'UdeA', 'udea.edu.co'),
+  ('Universidad Nacional de Colombia, sede Medellín', 'UNAL', 'unal.edu.co'),
+  ('Universidad Pontificia Bolivariana', 'UPB', 'upb.edu.co'),
+  ('Universidad de Medellín', 'UdeM', 'udem.edu.co'),
+  ('Universidad CES', 'CES', 'ces.edu.co'),
+  ('Universidad EIA', 'EIA', 'eia.edu.co'),
+  ('Politécnico Colombiano Jaime Isaza Cadavid', 'Poli JIC', 'elpoli.edu.co'),
+  ('Instituto Tecnológico Metropolitano', 'ITM', 'itm.edu.co'),
+  ('Institución Universitaria Pascual Bravo', 'Pascual Bravo', 'pascualbravo.edu.co'),
+  ('Universidad Católica Luis Amigó', 'Luis Amigó', 'amigo.edu.co'),
+  ('Universidad Autónoma Latinoamericana', 'UNAULA', 'unaula.edu.co'),
+  ('Institución Universitaria Colegio Mayor de Antioquia', 'Colmayor', 'colmayor.edu.co'),
+  ('Universidad de San Buenaventura, Medellín', 'USB', 'usbmed.edu.co'),
+  ('Universidad Demo (cuentas de prueba)', 'Demo', 'universidad.edu.co')
+ON CONFLICT (dominio) DO NOTHING;
+
+-- NULL solo en cuentas anteriores al catálogo cuyo dominio no está en él.
+ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS universidad_id INT REFERENCES universidades(id);
+UPDATE usuarios u SET universidad_id = un.id
+FROM universidades un
+WHERE u.universidad_id IS NULL AND un.dominio = split_part(lower(u.email), '@', 2);
 `;

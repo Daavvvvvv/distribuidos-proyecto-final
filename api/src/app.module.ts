@@ -10,6 +10,7 @@ import { EventosModule } from './eventos/eventos.module';
 import { HealthController } from './health/health.controller';
 import { InscripcionesModule } from './inscripciones/inscripciones.module';
 import { MetricasModule } from './metricas/metricas.module';
+import { UniversidadesModule } from './universidades/universidades.module';
 
 @Module({})
 export class AppModule {
@@ -29,6 +30,7 @@ export class AppModule {
         }),
         DbModule,
         MetricasModule,
+        UniversidadesModule,
         AuthModule,
         EventosModule,
         InscripcionesModule,
