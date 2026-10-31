@@ -7,6 +7,18 @@ resource "aws_ecs_cluster" "principal" {
   }
 }
 
+# El digest exacto de la imagen :latest que subió scripts/publicar.sh. La task definition apunta a
+# él (y no a la etiqueta) para que cada imagen nueva cree una revisión y ECS la despliegue.
+data "aws_ecr_image" "api" {
+  repository_name = aws_ecr_repository.api.name
+  image_tag       = "latest"
+}
+
+data "aws_ecr_image" "worker" {
+  repository_name = aws_ecr_repository.worker.name
+  image_tag       = "latest"
+}
+
 locals {
   # La API y el worker leen el mismo contrato de variables (ver api/src/config y worker/src/config).
   entorno_comun = [
@@ -29,7 +41,12 @@ locals {
 }
 
 resource "aws_ecs_task_definition" "api" {
-  family                   = "${local.nombre}-api"
+  family = "${local.nombre}-api"
+
+  # Registra la revisión nueva antes de retirar la vieja, así el servicio nunca apunta a una que no existe.
+  lifecycle {
+    create_before_destroy = true
+  }
   requires_compatibilities = ["FARGATE"]
   network_mode             = "awsvpc"
   cpu                      = "256"
@@ -39,7 +56,7 @@ resource "aws_ecs_task_definition" "api" {
 
   container_definitions = jsonencode([{
     name         = "api"
-    image        = "${aws_ecr_repository.api.repository_url}:latest"
+    image        = "${aws_ecr_repository.api.repository_url}@${data.aws_ecr_image.api.image_digest}"
     essential    = true
     portMappings = [{ containerPort = 3000, hostPort = 3000, protocol = "tcp" }]
     # SEED_DEMO crea las cuentas de la demo (ana y club) y unos eventos; es idempotente.
@@ -61,7 +78,12 @@ resource "aws_ecs_task_definition" "api" {
 }
 
 resource "aws_ecs_task_definition" "worker" {
-  family                   = "${local.nombre}-worker"
+  family = "${local.nombre}-worker"
+
+  # Registra la revisión nueva antes de retirar la vieja, así el servicio nunca apunta a una que no existe.
+  lifecycle {
+    create_before_destroy = true
+  }
   requires_compatibilities = ["FARGATE"]
   network_mode             = "awsvpc"
   cpu                      = "256"
@@ -71,7 +93,7 @@ resource "aws_ecs_task_definition" "worker" {
 
   container_definitions = jsonencode([{
     name        = "worker"
-    image       = "${aws_ecr_repository.worker.repository_url}:latest"
+    image       = "${aws_ecr_repository.worker.repository_url}@${data.aws_ecr_image.worker.image_digest}"
     essential   = true
     environment = local.entorno_comun
     secrets     = [local.secreto_bd]
