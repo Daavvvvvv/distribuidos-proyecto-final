@@ -50,6 +50,10 @@ describe('Eventos (/api/eventos)', () => {
         organizador: 'Club de Software',
         universidad: { id: expect.any(Number), nombre: 'Universidad Demo (cuentas de prueba)', sigla: 'Demo' },
         inscrito: false,
+        esOrganizador: true,
+        puedeInscribirse: false,
+        puedeCancelar: false,
+        motivo: 'Eres el organizador de este evento',
       });
     });
 
@@ -146,10 +150,10 @@ describe('Eventos (/api/eventos)', () => {
   });
 
   describe('GET /api/eventos/:id', () => {
-    it('devuelve el evento', async () => {
+    it('devuelve el evento con los permisos de quien lo pide', async () => {
       const evento = await crearEvento();
       const res = await http().get(`/api/eventos/${evento.id}`).set(como(estudiante.token)).expect(200);
-      expect(res.body).toEqual(evento);
+      expect(res.body).toEqual({ ...evento, esOrganizador: false, puedeInscribirse: true, puedeCancelar: false, motivo: null });
     });
 
     it('evento inexistente responde 404', async () => {

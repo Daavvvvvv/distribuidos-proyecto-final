@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import type { PoolClient } from 'pg';
 import { Db } from '../db/db';
 import { EventosService, type Evento } from '../eventos/eventos.service';
+import { MOTIVO, motivoParaNoInscribirse } from '../eventos/reglas-inscripcion';
 import { Metricas, type ResultadoInscripcion } from '../metricas/metricas';
 import { NotificacionesService } from '../notificaciones/notificaciones.service';
 
@@ -10,8 +11,8 @@ import { NotificacionesService } from '../notificaciones/notificaciones.service'
  * (de cualquier réplica): eventos distintos no se esperan entre sí.
  */
 async function bloquearEvento(c: PoolClient, eventoId: number) {
-  const { rows } = await c.query<{ cupo: number; inscritos: number; pasado: boolean }>(
-    'SELECT cupo, inscritos, fecha < now() AS pasado FROM eventos WHERE id = $1 FOR UPDATE',
+  const { rows } = await c.query<{ cupo: number; inscritos: number; pasado: boolean; organizador_id: number }>(
+    'SELECT cupo, inscritos, fecha < now() AS pasado, organizador_id FROM eventos WHERE id = $1 FOR UPDATE',
     [eventoId],
   );
   if (!rows[0]) throw new NotFoundException('El evento no existe');
@@ -51,8 +52,14 @@ export class InscripcionesService {
           return null;
         }
 
-        if (evento.pasado) throw new BadRequestException('El evento ya ocurrió');
-        if (evento.inscritos >= evento.cupo) throw new ConflictException('No quedan cupos para este evento');
+        const motivo = motivoParaNoInscribirse({
+          esOrganizador: evento.organizador_id === usuarioId,
+          pasado: evento.pasado,
+          lleno: evento.inscritos >= evento.cupo,
+        });
+        // 409 solo para el cupo: el frontend lo distingue de los demás rechazos.
+        if (motivo === MOTIVO.lleno) throw new ConflictException(motivo);
+        if (motivo) throw new BadRequestException(motivo);
 
         await c.query('INSERT INTO inscripciones (usuario_id, evento_id) VALUES ($1, $2)', [usuarioId, eventoId]);
         await c.query('UPDATE eventos SET inscritos = inscritos + 1 WHERE id = $1', [eventoId]);
@@ -81,7 +88,7 @@ export class InscripcionesService {
   async cancelar(usuarioId: number, eventoId: number): Promise<Evento> {
     await this.db.transaccion(async (c) => {
       const evento = await bloquearEvento(c, eventoId);
-      if (evento.pasado) throw new BadRequestException('El evento ya ocurrió');
+      if (evento.pasado) throw new BadRequestException(MOTIVO.pasado);
 
       const borrada = await c.query('DELETE FROM inscripciones WHERE usuario_id = $1 AND evento_id = $2', [
         usuarioId,

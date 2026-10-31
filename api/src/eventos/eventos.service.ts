@@ -3,6 +3,7 @@ import { Db } from '../db/db';
 import { UNIVERSIDAD_JSON } from '../universidades/universidad-json';
 import type { Universidad } from '../universidades/universidades.service';
 import type { CrearEventoDto, ListarEventosDto } from './dto/eventos.dto';
+import { permisos } from './reglas-inscripcion';
 
 /** Forma exacta que espera el frontend (README, "Forma de evento"). */
 export interface Evento {
@@ -19,6 +20,22 @@ export interface Evento {
   universidad: Universidad | null;
   /** Si el usuario autenticado ya está inscrito. */
   inscrito: boolean;
+  /** Si el usuario autenticado organiza el evento. */
+  esOrganizador: boolean;
+  puedeInscribirse: boolean;
+  puedeCancelar: boolean;
+  /** Por qué no hay acción disponible (null si puede inscribirse o cancelar). */
+  motivo: string | null;
+}
+
+type FilaEvento = Omit<Evento, 'esOrganizador' | 'puedeInscribirse' | 'puedeCancelar' | 'motivo'> & {
+  es_organizador: boolean;
+  pasado: boolean;
+};
+
+function aEvento({ es_organizador, pasado, ...fila }: FilaEvento): Evento {
+  const estado = { esOrganizador: es_organizador, inscrito: fila.inscrito, pasado, lleno: fila.inscritos >= fila.cupo };
+  return { ...fila, esOrganizador: es_organizador, ...permisos(estado) };
 }
 
 export interface Inscrito {
@@ -32,7 +49,9 @@ const SELECT_EVENTO = `
   SELECT e.id, e.titulo, e.descripcion, e.fecha, e.lugar, e.cupo, e.inscritos, e.categoria,
          u.nombre AS organizador,
          ${UNIVERSIDAD_JSON} AS universidad,
-         EXISTS (SELECT 1 FROM inscripciones i WHERE i.evento_id = e.id AND i.usuario_id = $1) AS inscrito
+         EXISTS (SELECT 1 FROM inscripciones i WHERE i.evento_id = e.id AND i.usuario_id = $1) AS inscrito,
+         e.organizador_id = $1 AS es_organizador,
+         e.fecha < now() AS pasado
   FROM eventos e
   JOIN usuarios u ON u.id = e.organizador_id
   LEFT JOIN universidades un ON un.id = u.universidad_id`;
@@ -58,7 +77,7 @@ export class EventosService {
   async listar(usuarioId: number, filtros: ListarEventosDto): Promise<Evento[]> {
     const q = filtros.q?.trim() || null;
     const categoria = filtros.categoria?.trim() || null;
-    const { rows } = await this.db.query<Evento>(
+    const { rows } = await this.db.query<FilaEvento>(
       `${SELECT_EVENTO}
        WHERE ($2::text IS NULL OR e.titulo ILIKE $2 OR e.descripcion ILIKE $2)
          AND ($3::text IS NULL OR e.categoria = $3)
@@ -66,24 +85,24 @@ export class EventosService {
        LIMIT ${LIMITE_LISTADO}`,
       [usuarioId, q && patronLiteral(q), categoria],
     );
-    return rows;
+    return rows.map(aEvento);
   }
 
   /** Eventos en los que el usuario está inscrito (GET /api/mis-inscripciones). */
   async inscritosPor(usuarioId: number): Promise<Evento[]> {
-    const { rows } = await this.db.query<Evento>(
+    const { rows } = await this.db.query<FilaEvento>(
       `${SELECT_EVENTO}
        WHERE EXISTS (SELECT 1 FROM inscripciones i WHERE i.evento_id = e.id AND i.usuario_id = $1)
        ${ORDEN_EVENTOS}`,
       [usuarioId],
     );
-    return rows;
+    return rows.map(aEvento);
   }
 
   async detalle(usuarioId: number, eventoId: number): Promise<Evento> {
-    const { rows } = await this.db.query<Evento>(`${SELECT_EVENTO} WHERE e.id = $2`, [usuarioId, eventoId]);
+    const { rows } = await this.db.query<FilaEvento>(`${SELECT_EVENTO} WHERE e.id = $2`, [usuarioId, eventoId]);
     if (!rows[0]) throw new NotFoundException('El evento no existe');
-    return rows[0];
+    return aEvento(rows[0]);
   }
 
   async crear(organizadorId: number, dto: CrearEventoDto): Promise<Evento> {

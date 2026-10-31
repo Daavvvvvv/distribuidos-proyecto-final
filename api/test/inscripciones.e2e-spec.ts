@@ -96,6 +96,38 @@ describe('Inscripciones', () => {
       await inscribir(eventoId).expect(200);
     });
 
+    it('el organizador no puede inscribirse a su propio evento: 400 sin inscripción ni aviso', async () => {
+      const eventoId = await crearEvento();
+      await inscribir(eventoId, organizador.token).expect(400, { error: 'Eres el organizador de este evento' });
+      expect(await enDb(eventoId)).toEqual({ inscritos: 0, filas: 0 });
+      expect(await notificaciones(eventoId)).toEqual([]);
+    });
+
+    it('cada evento dice qué puede hacer quien lo pide y, si no puede, por qué', async () => {
+      const eventoId = await crearEvento(1);
+      const detalle = (token = estudiante.token) =>
+        http().get(`/api/eventos/${eventoId}`).set(como(token)).expect(200).then((r) => r.body);
+      const permisos = (e: Record<string, unknown>) => ({
+        puedeInscribirse: e.puedeInscribirse,
+        puedeCancelar: e.puedeCancelar,
+        motivo: e.motivo,
+      });
+
+      expect(permisos(await detalle())).toEqual({ puedeInscribirse: true, puedeCancelar: false, motivo: null });
+      const inscrita = (await inscribir(eventoId).expect(200)).body;
+      expect(permisos(inscrita)).toEqual({ puedeInscribirse: false, puedeCancelar: true, motivo: null });
+
+      const otro = await registrar(app, 'estudiante');
+      expect(permisos(await detalle(otro.token))).toEqual({
+        puedeInscribirse: false,
+        puedeCancelar: false,
+        motivo: 'No quedan cupos para este evento',
+      });
+
+      await moverAlPasado(eventoId);
+      expect(permisos(await detalle())).toEqual({ puedeInscribirse: false, puedeCancelar: false, motivo: 'El evento ya ocurrió' });
+    });
+
     it('evento inexistente responde 404 y evento pasado responde 400', async () => {
       await inscribir(999999).expect(404, { error: 'El evento no existe' });
       const eventoId = await crearEvento();
