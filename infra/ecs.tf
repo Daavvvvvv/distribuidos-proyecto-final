@@ -112,7 +112,7 @@ resource "aws_ecs_service" "api" {
   name            = "api"
   cluster         = aws_ecs_cluster.principal.id
   task_definition = "${aws_ecs_task_definition.api.family}:${aws_ecs_task_definition.api.revision}"
-  desired_count   = var.app_enabled ? 2 : 0
+  desired_count   = var.app_enabled ? var.api_replicas : 0
   launch_type     = "FARGATE"
 
   network_configuration {

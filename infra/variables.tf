@@ -1,7 +1,14 @@
 variable "app_enabled" {
-  description = "Enciende la API (2 réplicas) y el worker (1). En false quedan en 0 tareas y Fargate no cobra."
+  description = "Enciende la API y el worker (1). En false quedan en 0 tareas y Fargate no cobra."
   type        = bool
   default     = false
+}
+
+# La prueba de disponibilidad compara 1 réplica (línea base) contra 2 (mejora).
+variable "api_replicas" {
+  description = "Réplicas de la API cuando app_enabled es true."
+  type        = number
+  default     = 2
 }
 
 locals {
