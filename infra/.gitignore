@@ -1,0 +1,7 @@
+# El state puede guardar secretos y vive solo en la máquina de quien aplica.
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+.build/
