@@ -17,7 +17,8 @@
     "demo:up": "docker compose up -d --build",
     "demo:concurrencia": "node scripts/prueba-concurrencia.mjs",
     "demo:caida": "node scripts/prueba-concurrencia.mjs --matar-replica",
-    "demo:breaker": "node scripts/demo-breaker.mjs"
+    "demo:breaker": "node scripts/demo-breaker.mjs",
+    "demo:poblar": "node scripts/poblar-demo.mjs"
   },
   "engines": {
     "node": ">=22.9"
